@@ -1,18 +1,18 @@
-# Car Movement on road intersection
+# Car Movement on a road intersection
 
-This is compatible with OpenAI gym enviroment which model movements of car on road intersections.
+This is a compatible with OpenAI gym enviroment which models movements of a car on a road intersection.
 
 ## Description
 
-Environment is a road intersection. Your agent (red car) started along with some number (default is 4) of bot cars (blue cars) which move along random predefined trajectory, i.e. left, straight, right.
+The environment is a road intersection. Your agent (red car) started along with some number (default is 4) of bot cars (blue cars) which move along random predefined trajectories, i.e. left, straight, right.
 
-Your agent receives reward 10000 after reaching red rectangle after which environment is reset.
-Along the way some penalties would be appointed for moving wrong way.
-Driving on sidewalk or colliding with another car in addition to penalty reset environment.
+Your agent receives reward 10000 after reaching a red rectangle and then the environment is reset.
+Along the way some penalties would be appointed for moving in the wrong way.
+Driving on sidewalks or colliding with another car in addition to penalty resets environment.
 
-Agent is control by four actions (steer angle, gas, break).
+An agent is controlled by four actions (steer angle, gas, break).
 
-Goal is to reach a destination in fastest and safest way possible.
+The goal is to reach a destination in the fastest and safest way possible.
 
 ## Getting Started
 
@@ -26,7 +26,7 @@ Run:
 pip install -r requirements.txt
 ```
 
-Obviously you need also your favorite deeplearning framework to train agent. (Make sure you did install box2d).
+Obviously you need also your favorite deeplearning framework to train an agent. (Make sure you did install box2d).
 If you are still in trouble try:
 
 ```
@@ -41,7 +41,7 @@ If you want simply to check how the environment works just run:
 python main.py
 ```
 
-You can control the agent (red car) by arrow keys.
+You can control an agent (red car) by arrow keys.
 
 Some modifications is also available. See some flags below.
 
@@ -51,7 +51,7 @@ To set the number of bot cars:
 python main.py --bots_number=2
 ```
 
-To remove the agent completely from the picture:
+To remove an agent completely from the picture:
 
 ```
 python main.py --no_agent
