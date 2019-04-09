@@ -21,8 +21,32 @@ from pyglet import gl
 
 import argparse
 
-# Havely Based on work of CarRacing OpenAI gym by Oleg Klimov.
-# Licensed on the same terms as the rest of OpenAI Gym.
+# Easiest continuous control task to learn from pixels, a top-down racing environment.
+# Discreet control is reasonable in this environment as well, on/off discretisation is
+# fine.
+#
+# State consists of STATE_W x STATE_H pixels.
+#
+# Reward is -0.1 every frame and +1000/N for every track tile visited, where N is
+# the total number of tiles in track. For example, if you have finished in 732 frames,
+# your reward is 1000 - 0.1*732 = 926.8 points.
+#
+# Game is solved when agent consistently gets 900+ points. Track is random every episode.
+#
+# Episode finishes when all tiles are visited. Car also can go outside of PLAYFIELD, that
+# is far off the track, then it will get -100 and die.
+#
+# Some indicators shown at the bottom of the window and the state RGB buffer. From
+# left to right: true speed, four ABS sensors, steering wheel position, gyroscope.
+#
+# To play yourself (it's rather fast for humans), type:
+#
+# python gym/envs/box2d/car_racing.py
+#
+# Remember it's powerful rear-wheel drive car, don't press accelerator and turn at the
+# same time.
+#
+# Created by Oleg Klimov. Licensed on the same terms as the rest of OpenAI Gym.
 
 STATE_W = 96   # less than Atari 160x192
 STATE_H = 96
@@ -243,7 +267,9 @@ class CarRacing(gym.Env, EzPickle):
         'video.frames_per_second' : FPS
     }
 
-    def __init__(self, agent = True, num_bots = 4, track_form = 'X', write = False, data_path = 'car_racing_positions.csv'):
+    def __init__(self, agent = True, num_bots = 1, track_form = 'X',
+                 write = False, data_path = 'car_racing_positions.csv',
+                 start_file = False):
         EzPickle.__init__(self)
         self.seed()
         self.contactListener_keepref = MyContactListener(self)
@@ -274,6 +300,13 @@ class CarRacing(gym.Env, EzPickle):
         self.moved_distance = deque(maxlen=1000)
         self.target = (0, 0)
         self.num_bots = num_bots
+
+        self.start_file = start_file
+        if start_file:
+            with open("start_file.csv", 'r') as f:
+                lines = f.readlines()
+                self.start_positions = lines[15].strip().split(",")
+                self.num_bots = len(self.start_positions) - 1
 
         self.action_space = spaces.Box( np.array([-1,0,0]), np.array([+1,+1,+1]), dtype=np.float32)  # steer, gas, brake
         self.observation_space = spaces.Box(low=0, high=255, shape=(STATE_H, STATE_W, 3), dtype=np.uint8)
@@ -404,6 +437,36 @@ class CarRacing(gym.Env, EzPickle):
 
         return target, new_position
 
+    def start_file_position(self, forward_shift=0, bot=True, exclude=None, number=0):
+
+        target = self.start_positions[number]
+
+        # if some cars on the same trajectory add distance between them
+        space = 6*self.bot_targets.count(target[0]) - 3 - forward_shift
+
+        if target[0] == '3':
+            new_position = (-np.pi/2, -PLAYFIELD-space, -ROAD_WIDTH/2)
+        if target[0] == '5':
+            new_position = (0, ROAD_WIDTH/2, -PLAYFIELD-space)
+        if target[0] == '7':
+            new_position = (np.pi/2, PLAYFIELD+space, ROAD_WIDTH/2)
+        if target[0] == '9':
+            new_position = (np.pi, -ROAD_WIDTH/2, PLAYFIELD+space)
+
+        if not bot:
+            _, x, y = new_position
+            if abs(x) > PLAYFIELD-5 or abs(y) > PLAYFIELD-5:
+                return self.random_position(forward_shift, bot, exclude=exclude)
+
+        for car in self.bot_cars:
+            if car.close_to_target(new_position[1:], dist=3):
+                # print(f"car target: {car.hull.path} and new_coord: {target}")
+                # print(f"car position: {car.hull.position} and new_coord: {new_position[1:]}")
+                # Choose new position:
+                return self.random_position(forward_shift, bot, exclude=exclude)
+
+        return target, new_position
+
     def _to_file(self):
         car_position = [self.car.hull.angle,
                         self.car.hull.position.x,
@@ -445,8 +508,11 @@ class CarRacing(gym.Env, EzPickle):
         # init_colors = [(0.8, 0.4, 1), (1, 0.5, 0.1), (0.1, 1, 0.1), (0.2, 0.8, 1)]
         # trajectory = ['38', '52', '74', '96']
         # self.bot_targets.extend([t[0] for t in trajectory])
-        for _ in range(self.num_bots):
-            target, new_coord = self.random_position(forward_shift=25)
+        for i in range(self.num_bots):
+            if self.start_file:
+                target, new_coord = self.start_file_position(forward_shift=25, number=i+1)
+            else:
+                target, new_coord = self.random_position(forward_shift=25)
             self.bot_targets.append(target[0])
             car = DummyCar(self.world, new_coord, color=None, bot=True)
             # j = 2*i+4 if 2*i+4 < 9 else 2
@@ -464,11 +530,15 @@ class CarRacing(gym.Env, EzPickle):
         #     self.bot_cars.append(car)
 
         # Generate Agent:
+        print(self.agent)
         if not self.agent:
             init_coord = (0, PLAYFIELD+2, PLAYFIELD)
             target = np.random.choice(list(PATH.keys()))
         else:
-            target, init_coord = self.random_position(forward_shift=25, bot=False)
+            if self.start_file:
+                target, init_coord = self.start_file_position(forward_shift=25, bot=False)
+            else:
+                target, init_coord = self.random_position(forward_shift=25, bot=False)
         # target, init_coord = '38', (-np.pi/2, -PLAYFIELD+15, -ROAD_WIDTH/2+2)
         penalty_sections = {2, 3, 4, 5, 6, 7, 8, 9} - set(map(int, target))
         self.car = DummyCar(self.world, init_coord, penalty_sections)
@@ -543,34 +613,35 @@ class CarRacing(gym.Env, EzPickle):
         # Reward:
         step_reward = 0
         done = False
-        if action is not None: # First step without action, called from reset()
-            self.reward -= 1
-            step_reward = self.reward - self.prev_reward
-            self.prev_reward = self.reward
-            x, y = self.car.hull.position
-            if abs(x) > PLAYFIELD+5 or abs(y) > PLAYFIELD+5:
-                done = True
-                step_reward += -100
-            if self.car.close_to_target(PATH[self.car.hull.path][-1], dist=10):
-                done = True
-                step_reward += 1000
-            if self.car.hull.collision:
-                done = True
-                step_reward += -100
-            if np.any([w.collision for w in self.car.wheels]):
-                done = True
-                step_reward += -100
-            if self.car.hull.penalty:
-                # done = True
-                step_reward += -20
-            if np.linalg.norm(self.car.hull.linearVelocity) < 1:
-                step_reward += -20
-            if len(self.moved_distance) == self.moved_distance.maxlen:
-                prev_pos = np.array(self.moved_distance[0])
-                curr = np.array(self.moved_distance[-1])
-                if np.linalg.norm(prev_pos - curr) < 1:
+        if self.agent:
+            if action is not None: # First step without action, called from reset()
+                self.reward -= 0.01
+                step_reward = self.reward - self.prev_reward
+                self.prev_reward = self.reward
+                x, y = self.car.hull.position
+                if abs(x) > PLAYFIELD+5 or abs(y) > PLAYFIELD+5:
                     done = True
-                    step_reward += -20
+                    step_reward += -1
+                if self.car.close_to_target(PATH[self.car.hull.path][-1], dist=10):
+                    done = True
+                    step_reward += 10
+                if self.car.hull.collision:
+                    done = True
+                    step_reward += -1
+                if np.any([w.collision for w in self.car.wheels]):
+                    done = True
+                    step_reward += -1
+                if self.car.hull.penalty:
+                    # done = True
+                    step_reward += -0.1
+                if np.linalg.norm(self.car.hull.linearVelocity) < 1:
+                    step_reward += -0.1
+                if len(self.moved_distance) == self.moved_distance.maxlen:
+                    prev_pos = np.array(self.moved_distance[0])
+                    curr = np.array(self.moved_distance[-1])
+                    if np.linalg.norm(prev_pos - curr) < 1:
+                        done = True
+                        step_reward += -10
 
         return self.state, step_reward, done, {}
 
@@ -602,7 +673,7 @@ class CarRacing(gym.Env, EzPickle):
 
         arr = None
         win = self.viewer.window
-        if mode != 'state_pixels':
+        if mode != 'state_pixels' and mode != 'rgb_array':
             win.switch_to()
             win.dispatch_events()
         if mode=="rgb_array" or mode=="state_pixels":
@@ -728,9 +799,10 @@ class CarRacing(gym.Env, EzPickle):
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--bots_number", type=int, default=4, help="Number of bot cars in environment.")
-    parser.add_argument("--write", default=False, action="store_true", help="Whehter write cars' coord to file.")
+    parser.add_argument("--write", default=False, action="store_true", help="Whether write cars' coord to file.")
     parser.add_argument("--dir", default='car_racing_positions.csv', help="Dir of csv file with car's coord.")
-    parser.add_argument("--no_agent", default=True, action="store_false", help="Wehter show an agent or not")
+    parser.add_argument("--no_agent", default=True, action="store_false", help="Wether show an agent or not")
+    parser.add_argument("--using_start_file", default=False, action="store_true", help="Wether start position is in file")
     args = parser.parse_args()
 
     from pyglet.window import key
@@ -748,7 +820,10 @@ if __name__=="__main__":
         if k==key.UP:    a[1] = 0
         if k==key.DOWN:  a[2] = 0
 
-    env = CarRacing(agent=args.no_agent, num_bots=args.bots_number, write=args.write, data_path=args.dir)
+    if args.using_start_file:
+        env = CarRacing(agent=args.no_agent, write=args.write, data_path=args.dir, start_file=args.using_start_file)
+    else:
+        env = CarRacing(agent=args.no_agent, num_bots=args.bots_number, write=args.write, data_path=args.dir)
     env.render()
     record_video = False
     if record_video:
