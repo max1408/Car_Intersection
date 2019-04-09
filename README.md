@@ -57,22 +57,8 @@ To remove an agent completely from the picture:
 python main.py --no_agent
 ```
 
-To define your own start positions make changes in _start_file.csv_
-This is how road looks like.
-To make specific start just put start and end in the table below.
-The quantity of bot cars is arbitrary. Put as much as you need.
-Possible direction for path 3: 34, 36, 38. Similar for 5, 7 and 9.
-
-   |   |   |
-   | 9 | 8 |
-\___|   |   |___
- 2           7
-___         ___
- 3           6
-___         ___
-   |   |   |
-   | 4 | 5 |
-   |   |   |
+To define your own start positions make changes in _start_file.csv_.
+For further instructions see the file.
 
 Command to get data from file:
 
@@ -96,8 +82,9 @@ python main.py --dir DIR
 It keeps numbers for cars' positions after each tick in environment.
 First three numbers is car_angle, car_pos_x, car_pos_y;
 Then the same three numbers (angle, position x, position y) go for each bot car.
+
 (FYI: Entire Playfield is from -60 to 60 units. Road width is 16 units.
-      Center of crossroad is 0)
+      Center of crossroad is (0,0))
 
 
 ### Example
