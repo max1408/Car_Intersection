@@ -2,6 +2,15 @@
 
 This is a compatible with OpenAI gym enviroment which models movements of a car on a road intersection.
 
+To run an agent please see folder _gym-car-intersect_.
+
+To train discrete environment:
+
+```
+cd gym-car-intersect
+python run_agent.py
+```
+
 ## Description
 
 The environment is a road intersection. Your agent (red car) started along with some number (default is 4) of bot cars (blue cars) which move along random predefined trajectories, i.e. left, straight, right.
